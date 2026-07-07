@@ -10,9 +10,10 @@ from datetime import datetime
 import streamlit as st
 import json
 
-load_dotenv()
+script_dir = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(script_dir, ".env"))
 api_key = os.getenv("GROQ_API_KEY")
-client = Groq(api_key=api_key)
+client = Groq(api_key=api_key) if api_key else None
 
 
 # PERSONALITIES
@@ -37,6 +38,12 @@ st.markdown("""
     .main { background-color: #0f1419; color: #ffffff; }
     </style>
     """, unsafe_allow_html=True)
+
+if client is None:
+    st.sidebar.error(
+        "Missing GROQ_API_KEY. Create a `.env` file with `GROQ_API_KEY=your_api_key_here` "
+        "or configure the environment variable before running this app."
+    )
 
 
 # SIDEBAR
@@ -111,31 +118,37 @@ chat_container = st.container()
 user_input = st.chat_input("Type your message here...")
 
 if user_input:
-    st.session_state.conversation_history.append({"role": "user", "content": user_input})
-    st.session_state.message_count += 1
-    
-    user_sentiment = analyze_sentiment(user_input)
-    st.session_state.sentiment_scores[user_sentiment] += 1
-    
-    user_keywords = get_keywords(user_input)
-    for keyword in user_keywords:
-        st.session_state.keywords[keyword] = st.session_state.keywords.get(keyword, 0) + 1
-    
-    with st.spinner("🤖 Murthu's AI thinking..."):
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=st.session_state.conversation_history
+    if client is None:
+        st.error(
+            "Unable to send your message because GROQ_API_KEY is missing. "
+            "Please add it to a `.env` file or configure the environment variable."
         )
-    
-    ai_reply = response.choices[0].message.content
-    st.session_state.conversation_history.append({"role": "assistant", "content": ai_reply})
-    
-    ai_sentiment = analyze_sentiment(ai_reply)
-    st.session_state.sentiment_scores[ai_sentiment] += 1
-    
-    ai_keywords = get_keywords(ai_reply)
-    for keyword in ai_keywords:
-        st.session_state.keywords[keyword] = st.session_state.keywords.get(keyword, 0) + 1
+    else:
+        st.session_state.conversation_history.append({"role": "user", "content": user_input})
+        st.session_state.message_count += 1
+        
+        user_sentiment = analyze_sentiment(user_input)
+        st.session_state.sentiment_scores[user_sentiment] += 1
+        
+        user_keywords = get_keywords(user_input)
+        for keyword in user_keywords:
+            st.session_state.keywords[keyword] = st.session_state.keywords.get(keyword, 0) + 1
+        
+        with st.spinner("🤖 Murthu's AI thinking..."):
+            response = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=st.session_state.conversation_history
+            )
+        
+        ai_reply = response.choices[0].message.content
+        st.session_state.conversation_history.append({"role": "assistant", "content": ai_reply})
+        
+        ai_sentiment = analyze_sentiment(ai_reply)
+        st.session_state.sentiment_scores[ai_sentiment] += 1
+        
+        ai_keywords = get_keywords(ai_reply)
+        for keyword in ai_keywords:
+            st.session_state.keywords[keyword] = st.session_state.keywords.get(keyword, 0) + 1
 
 
 # DISPLAY CONVERSATION
