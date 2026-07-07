@@ -1,0 +1,6 @@
+venv/
+.env
+__pycache__/
+.streamlit/
+*.json
+chat_history_*.txt
